@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dokumentasi Article Creation LangGraph</title>
+<style>
+  /* ============================================================
+     TEMA: semua warna didefinisikan sebagai variabel CSS.
+     Mode gelap otomatis mengikuti pengaturan sistem (prefers-color-scheme).
+     ============================================================ */
+  :root {
+    --bg: #f7f7f4;
+    --surface: #ffffff;
+    --surface-2: #f0f0ea;
+    --text: #1c1c1a;
+    --muted: #63635d;
+    --border: #dcdcd3;
+    --accent: #2f5fd0;
+    --accent-soft: #e4ecfb;
+    --llm: #2f5fd0;       /* node yang memanggil LLM */
+    --llm-soft: #e4ecfb;
+    --plain: #5f6368;     /* node biasa (tanpa LLM) */
+    --plain-soft: #ececea;
+    --human: #b26a00;     /* node yang menunggu manusia */
+    --human-soft: #fdf0d8;
+    --ctrl: #2e7d4f;      /* START / END */
+    --ctrl-soft: #def3e6;
+    --code-bg: #14161a;
+    --code-text: #e6e6e1;
+    --code-comment: #7fc18f;
+    --warn-bg: #fdf0d8;
+    --warn-border: #e8c27a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121315;
+      --surface: #1b1c1f;
+      --surface-2: #232529;
+      --text: #ecebe6;
+      --muted: #a2a29a;
+      --border: #34363b;
+      --accent: #7ea2f4;
+      --accent-soft: #1f2a44;
+      --llm: #7ea2f4;
+      --llm-soft: #1f2a44;
+      --plain: #a8abb0;
+      --plain-soft: #2a2c30;
+      --human: #f0b34f;
+      --human-soft: #3a2d12;
+      --ctrl: #6fcf97;
+      --ctrl-soft: #17301f;
+      --code-bg: #0c0d0f;
+      --warn-bg: #3a2d12;
+      --warn-border: #6b5220;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 16px; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  h1, h2, h3 { line-height: 1.25; margin: 0 0 .5em; }
+  h1 { font-size: 2rem; }
+  h2 { font-size: 1.5rem; padding-top: .2em; }
+  h3 { font-size: 1.1rem; }
+  p { margin: 0 0 1em; }
+  a { color: var(--accent); }
+  code {
+    font: .9em ui-monospace, "Cascadia Code", Consolas, monospace;
+    background: var(--surface-2);
+    padding: .1em .35em;
+    border-radius: 4px;
+  }
+
+  /* ---------- Tata letak: sidebar + konten ---------- */
+  .layout { display: flex; max-width: 1180px; margin: 0 auto; }
+  nav.side {
+    position: sticky; top: 0; align-self: flex-start;
+    width: 220px; flex: none; height: 100vh; overflow-y: auto;
+    padding: 24px 16px; border-right: 1px solid var(--border);
+  }
+  nav.side .brand { font-weight: 700; margin-bottom: 16px; }
+  nav.side a {
+    display: block; padding: 6px 10px; margin: 2px 0;
+    border-radius: 6px; color: var(--muted); text-decoration: none; font-size: .95rem;
+  }
+  nav.side a:hover { background: var(--surface-2); color: var(--text); }
+  nav.side a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  main { flex: 1; min-width: 0; padding: 32px 28px 80px; }
+  section { margin-bottom: 64px; }
+
+  /* ---------- Komponen umum ---------- */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px 20px;
+  }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+  .badge {
+    display: inline-block; font-size: .75rem; font-weight: 600;
+    padding: 2px 8px; border-radius: 999px; margin-right: 4px;
+  }
+  .b-llm { background: var(--llm-soft); color: var(--llm); }
+  .b-plain { background: var(--plain-soft); color: var(--plain); }
+  .b-human { background: var(--human-soft); color: var(--human); }
+  .b-ctrl { background: var(--ctrl-soft); color: var(--ctrl); }
+  .note {
+    background: var(--warn-bg); border: 1px solid var(--warn-border);
+    border-radius: 10px; padding: 12px 16px; margin: 0 0 1em;
+  }
+  button, select {
+    font: inherit; color: var(--text); background: var(--surface);
+    border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; cursor: pointer;
+  }
+  button:hover { background: var(--surface-2); }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.primary:hover { filter: brightness(1.1); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- Blok kode ---------- */
+  pre.code {
+    background: var(--code-bg); color: var(--code-text);
+    border-radius: 10px; padding: 16px; overflow-x: auto;
+    font: .86rem/1.55 ui-monospace, "Cascadia Code", Consolas, monospace;
+    margin: 0;
+  }
+  pre.code .c { color: var(--code-comment); }   /* komentar kode dibuat hijau agar mudah dibaca */
+  .cmd {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--code-bg); color: var(--code-text);
+    border-radius: 8px; padding: 8px 8px 8px 14px; margin: 8px 0;
+    font: .88rem ui-monospace, Consolas, monospace;
+  }
+  .cmd code { background: none; color: inherit; padding: 0; flex: 1; overflow-x: auto; white-space: pre; }
+  .cmd button { font-size: .8rem; padding: 3px 10px; }
+
+  /* ---------- Langkah memulai (checklist) ---------- */
+  .steps { list-style: none; padding: 0; margin: 0; counter-reset: s; }
+  .steps li { counter-increment: s; position: relative; padding: 0 0 22px 48px; }
+  .steps li::before {
+    content: counter(s); position: absolute; left: 0; top: 0;
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent);
+    display: grid; place-items: center; font-weight: 700;
+  }
+  .steps li.done::before { content: "✓"; background: var(--ctrl); color: #fff; }
+  .steps label { cursor: pointer; font-size: .85rem; color: var(--muted); }
+
+  /* ---------- Diagram workflow ---------- */
+  .wf-wrap { display: grid; gap: 16px; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
+  svg.wf { width: 100%; height: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+  svg.wf text { font: 13px system-ui, sans-serif; fill: var(--text); pointer-events: none; }
+  svg.wf .lbl { font-size: 11px; fill: var(--muted); }
+  svg.wf .edge { fill: none; stroke: var(--muted); stroke-width: 1.6; }
+  svg.wf .edge.cond { stroke-dasharray: 5 4; }
+  svg.wf .edge.on { stroke: var(--accent); stroke-width: 2.6; }
+  svg.wf .node { cursor: pointer; }
+  svg.wf .node rect, svg.wf .node ellipse { stroke-width: 1.6; transition: stroke-width .15s, filter .15s; }
+  svg.wf .node.llm rect { fill: var(--llm-soft); stroke: var(--llm); }
+  svg.wf .node.plain rect { fill: var(--plain-soft); stroke: var(--plain); }
+  svg.wf .node.human rect { fill: var(--human-soft); stroke: var(--human); }
+  svg.wf .node.ctrl ellipse { fill: var(--ctrl-soft); stroke: var(--ctrl); }
+  svg.wf .node:hover rect, svg.wf .node:hover ellipse { stroke-width: 3; }
+  svg.wf .node.sel rect, svg.wf .node.sel ellipse { stroke-width: 3.5; }
+  svg.wf .node.active rect, svg.wf .node.active ellipse { stroke-width: 4; filter: drop-shadow(0 0 6px var(--accent)); }
+  .detail h3 { margin-top: 0; }
+  .detail dl { margin: 0; }
+  .detail dt { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-top: 12px; }
+  .detail dd { margin: 2px 0 0; }
+
+  /* ---------- Simulator ---------- */
+  .sim-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 14px 0; }
+  .sim-controls label { font-size: .9rem; color: var(--muted); }
+  table.state { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  table.state th, table.state td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  table.state td.empty { color: var(--muted); }
+  table.state tr.changed td { background: var(--accent-soft); }
+  ol.log { margin: 0; padding-left: 22px; font-size: .9rem; max-height: 220px; overflow-y: auto; }
+  ol.log li { margin-bottom: 4px; }
+  ol.log li.now { font-weight: 600; }
+
+  /* ---------- Tab kode ---------- */
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .tabs button[aria-selected="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .code-info { color: var(--muted); font-size: .9rem; margin-bottom: 8px; }
+
+  /* ---------- Akordeon ---------- */
+  details { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; padding: 10px 16px; }
+  summary { cursor: pointer; font-weight: 600; }
+  details[open] summary { margin-bottom: 6px; }
+
+  pre.tree { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font: .85rem/1.5 ui-monospace, Consolas, monospace; margin: 0; }
+
+  /* ---------- Responsif: layar sempit ---------- */
+  @media (max-width: 900px) {
+    .layout { flex-direction: column; }
+    nav.side { position: static; width: 100%; height: auto; display: flex; flex-wrap: wrap; gap: 4px; border-right: 0; border-bottom: 1px solid var(--border); padding: 12px 16px; }
+    nav.side .brand { width: 100%; margin: 0 0 4px; }
+    .wf-wrap { grid-template-columns: 1fr; }
+    main { padding: 24px 16px 60px; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ===================== SIDEBAR NAVIGASI ===================== -->
+  <nav class="side" aria-label="Navigasi dokumen">
+    <div class="brand">📄 Article Creation<br><small style="font-weight:400;color:var(--muted)">latihan LangGraph</small></div>
+    <a href="#ringkasan">Ringkasan</a>
+    <a href="#mulai">Cara memulai</a>
+    <a href="#workflow">Alur workflow</a>
+    <a href="#agents">Agents &amp; node</a>
+    <a href="#state">State</a>
+    <a href="#kode">Kode beranotasi</a>
+    <a href="#konsep">Konsep LangGraph</a>
+    <a href="#catatan">Catatan penting</a>
+  </nav>
+
+  <main>
+
+    <!-- ===================== RINGKASAN ===================== -->
+    <section id="ringkasan">
+      <h1>Article Creation dengan LangGraph</h1>
+      <p>
+        Folder latihan LangGraph: sebuah pipeline multi-agent yang membuat artikel blog dari satu topik.
+        Beberapa agent LLM bekerja bergantian (membuat outline, menulis, menilai), lalu
+        <strong>manusia</strong> memberi persetujuan akhir sebelum artikel disimpan sebagai file Markdown.
+      </p>
+      <div class="grid">
+        <div class="card"><h3>Input</h3><p>Satu topik, misalnya <code>"Agentic AI in 2027"</code> (diatur di <code>main.py</code>).</p></div>
+        <div class="card"><h3>Output</h3><p>File <code>output/&lt;topik&gt;-&lt;waktu&gt;.md</code> beserta prompt gambar cover di state.</p></div>
+        <div class="card"><h3>LLM</h3><p><code>ChatOpenAI</code> dari <code>langchain_openai</code>, diarahkan ke <strong>OpenRouter</strong> lewat <code>.env</code>.</p></div>
+        <div class="card"><h3>Fitur LangGraph yang dilatih</h3><p>Conditional edge, loop revisi, checkpointer SQLite, streaming, human-in-the-loop.</p></div>
+      </div>
+
+      <h3 style="margin-top:28px">Struktur folder</h3>
+      <pre class="tree">belajar_article_creation/
+├── main.py              <span style="color:var(--code-comment)">← titik masuk: menjalankan graph, streaming, approval manusia</span>
+├── agents/              <span style="color:var(--code-comment)">← satu class per agent (yang memanggil LLM)</span>
+│   ├── orchestrator.py  <span style="color:var(--code-comment)">   topik → outline</span>
+│   ├── generator.py     <span style="color:var(--code-comment)">   outline → artikel (+ revisi)</span>
+│   ├── evaluator.py     <span style="color:var(--code-comment)">   artikel → feedback + approved</span>
+│   └── image_prompt.py  <span style="color:var(--code-comment)">   artikel → prompt gambar cover</span>
+├── graph/
+│   ├── state.py         <span style="color:var(--code-comment)">← ArticleState: data bersama antar node</span>
+│   ├── nodes.py         <span style="color:var(--code-comment)">← fungsi node (tipis, memanggil agent/service)</span>
+│   ├── router.py        <span style="color:var(--code-comment)">← fungsi penentu cabang conditional edge</span>
+│   └── workflow.py      <span style="color:var(--code-comment)">← merakit node + edge menjadi graph</span>
+├── prompts/article_prompts.py  <span style="color:var(--code-comment)">← semua template prompt</span>
+├── services/storage.py  <span style="color:var(--code-comment)">← menyimpan artikel ke file</span>
+├── models/evaluation.py <span style="color:var(--code-comment)">← EvaluationResult (output terstruktur evaluator)</span>
+├── config/              <span style="color:var(--code-comment)">← settings (.env) dan pembuat LLM</span>
+├── memory/              <span style="color:var(--code-comment)">← checkpoints.db (SQLite, di-ignore git)</span>
+├── output/              <span style="color:var(--code-comment)">← artikel .md hasil akhir</span>
+└── tests/               <span style="color:var(--code-comment)">← skrip uji mandiri (bukan pytest)</span></pre>
+    </section>
+
+    <!-- ===================== CARA MEMULAI ===================== -->
+    <section id="mulai">
+      <h2>Cara memulai</h2>
+      <p>Centang tiap langkah setelah selesai (tersimpan di browser Anda). Perintah ditulis untuk <strong>Windows</strong>.</p>
+
+      <ol class="steps" id="steps">
+        <li data-step="venv">
+          <strong>Siapkan virtual environment</strong>
+          <div class="cmd"><code>python -m venv .venv</code><button data-copy>Salin</button></div>
+          <div class="cmd"><code>.venv\Scripts\activate</code><button data-copy>Salin</button></div>
+          <label><input type="checkbox"> sudah</label>
+        </li>
+        <li data-step="pip">
+          <strong>Pasang dependensi</strong>
+          <div class="cmd"><code>pip install -r requirements.txt</code><button data-copy>Salin</button></div>
+          <p style="margin:6px 0 0;color:var(--muted);font-size:.9rem">
+            Jika muncul <code>CERTIFICATE_VERIFY_FAILED</code> (proxy/antivirus mencegat HTTPS), cara cepat tapi
+            <em>mematikan verifikasi sertifikat</em>:
+            <code>pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org -r requirements.txt</code>.
+            Lebih aman: perbaiki sertifikat Python/jaringannya.
+          </p>
+          <label><input type="checkbox"> sudah</label>
+        </li>
+        <li data-step="env">
+          <strong>Buat file <code>.env</code></strong> di root proyek dengan isi:
+          <pre class="code" style="margin-top:8px"><span class="c"># API key OpenRouter Anda (wajib)</span>
+OPENROUTER_API_KEY=isi-key-anda
+<span class="c"># Nama model di OpenRouter (wajib)</span>
+OPENROUTER_MODEL=nama-model-pilihan-anda
+<span class="c"># Opsional; default: https://openrouter.ai/api/v1</span>
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1</pre>
+          <p style="margin:6px 0 0;color:var(--muted);font-size:.9rem">
+            Tanpa dua variabel wajib itu, <code>import config.settings</code> langsung gagal, sehingga semua yang
+            memakai LLM ikut gagal. File <code>.env</code> sudah di-ignore git.
+          </p>
+          <label><input type="checkbox"> sudah</label>
+        </li>
+        <li data-step="run">
+          <strong>Jalankan aplikasi</strong>
+          <div class="cmd"><code>python main.py</code><button data-copy>Salin</button></div>
+          <p style="margin:6px 0 0">Yang akan terjadi:</p>
+          <ol style="margin:4px 0 0;color:var(--muted);font-size:.92rem">
+            <li style="all:unset;display:list-item">Progres tercetak per node, mis. <code>[generator] selesai, mengubah: ['article']</code>.</li>
+            <li style="all:unset;display:list-item">Graph berhenti di <code>human_review</code>: artikel dan prompt gambar ditampilkan, lalu Anda diminta mengetik <code>y</code> atau <code>n</code>.</li>
+            <li style="all:unset;display:list-item"><code>y</code> → artikel disimpan ke <code>output/</code>. Jawaban lain → selesai tanpa menyimpan.</li>
+            <li style="all:unset;display:list-item">Di akhir tercetak <code>thread_id</code> dan riwayat checkpoint.</li>
+          </ol>
+          <label><input type="checkbox"> sudah</label>
+        </li>
+        <li data-step="history">
+          <strong>Lihat lagi run lama</strong> (tanpa memanggil LLM), memakai <code>thread_id</code> dari output run sebelumnya:
+          <div class="cmd"><code>python main.py &lt;thread_id&gt;</code><button data-copy>Salin</button></div>
+          <label><input type="checkbox"> sudah</label>
+        </li>
+        <li data-step="tests">
+          <strong>Jalankan tes</strong> dari root proyek (tidak ada pytest; tiap file adalah skrip yang mencetak hasil):
+          <div class="cmd"><code>python -m tests.test_human_review</code><button data-copy>Salin</button></div>
+          <details style="margin-top:8px">
+            <summary>Tes mana yang memanggil LLM sungguhan?</summary>
+            <p><strong>Tanpa LLM</strong> (agent palsu, cepat): <code>test_router</code>, <code>test_storage</code>, <code>test_checkpointer</code>,
+              <code>test_sqlite_checkpointer</code>, <code>test_streaming</code>, <code>test_human_review</code>.</p>
+            <p><strong>Memanggil LLM</strong> (butuh <code>.env</code> aktif): <code>test_evaluator</code>, <code>test_generator</code>,
+              <code>test_image_prompt</code>. Ada juga <code>test_conditional_edge</code> dan <code>test_evaluation_model</code> (skrip kecil).</p>
+          </details>
+          <label><input type="checkbox"> sudah</label>
+        </li>
+      </ol>
+    </section>
+
+    <!-- ===================== WORKFLOW ===================== -->
+    <section id="workflow">
+      <h2>Alur workflow</h2>
+      <p>
+        <strong>Klik sebuah node</strong> pada diagram untuk melihat detailnya. Garis putus-putus adalah
+        <em>conditional edge</em> (cabang ditentukan fungsi router). Di bawah diagram ada simulator untuk
+        menjalankan alurnya langkah demi langkah.
+      </p>
+      <p>
+        <span class="badge b-llm">Memanggil LLM</span>
+        <span class="badge b-plain">Node biasa</span>
+        <span class="badge b-human">Menunggu manusia</span>
+        <span class="badge b-ctrl">START / END</span>
+      </p>
+
+      <div class="wf-wrap">
+        <!-- Diagram dibuat sebagai SVG; node/edge digambar oleh JavaScript di bagian bawah -->
+        <svg class="wf" id="wf" viewBox="0 0 640 520" role="img" aria-label="Diagram alur workflow"></svg>
+        <div class="card detail" id="detail" aria-live="polite"></div>
+      </div>
+
+      <h3 style="margin-top:32px">Simulator</h3>
+      <p>
+        Atur bagaimana evaluator dan manusia memutuskan, lalu tekan <strong>Langkah berikut</strong>.
+        Tabel menunjukkan isi state setelah tiap node; baris yang baru berubah disorot.
+        Batas revisi di kode: <code>MAX_REVISIONS = 2</code>.
+      </p>
+      <div class="sim-controls">
+        <label>Evaluator menolak
+          <select id="sim-rejects">
+            <option value="0">0 kali (langsung setuju)</option>
+            <option value="1">1 kali</option>
+            <option value="2">2 kali</option>
+            <option value="3">3 kali (jatah revisi habis)</option>
+          </select>
+        </label>
+        <label>Keputusan manusia
+          <select id="sim-human">
+            <option value="y">y (setuju)</option>
+            <option value="n">n (tolak)</option>
+          </select>
+        </label>
+        <button class="primary" id="sim-next">Langkah berikut</button>
+        <button id="sim-auto">▶ Putar otomatis</button>
+        <button id="sim-reset">Reset</button>
+      </div>
+      <div class="wf-wrap" style="grid-template-columns:minmax(0,1.2fr) minmax(0,1fr)">
+        <div class="card">
+          <h3>State saat ini</h3>
+          <table class="state" id="sim-state"></table>
+        </div>
+        <div class="card">
+          <h3>Log langkah</h3>
+          <ol class="log" id="sim-log"><li style="color:var(--muted)">Belum mulai.</li></ol>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== AGENTS ===================== -->
+    <section id="agents">
+      <h2>Agents &amp; node</h2>
+      <p>
+        Setiap <em>agent</em> adalah class di <code>agents/</code> dengan satu method <code>run(state)</code>.
+        <em>Node</em> di <code>graph/nodes.py</code> hanya membuat agent lalu memanggil <code>run</code>, jadi
+        logika agent bisa dites tanpa LangGraph. Agent mengembalikan <strong>hanya field yang berubah</strong>;
+        LangGraph yang menggabungkannya ke state.
+      </p>
+      <div class="grid">
+        <div class="card">
+          <span class="badge b-llm">LLM</span><h3>OrchestratorAgent</h3>
+          <p>Membuat outline artikel dari topik.</p>
+          <p><strong>Membaca:</strong> <code>topic</code><br><strong>Menulis:</strong> <code>outline</code></p>
+          <p style="color:var(--muted);font-size:.9rem">Prompt: <code>ORCHESTRATOR_PROMPT</code></p>
+        </div>
+        <div class="card">
+          <span class="badge b-llm">LLM</span><h3>GeneratorAgent</h3>
+          <p>Menulis artikel Markdown. Jika sudah ada <code>feedback</code> dan draft lama, ia merevisi draft itu.</p>
+          <p><strong>Membaca:</strong> <code>topic</code>, <code>outline</code>, (<code>article</code>, <code>feedback</code>, <code>revision_count</code>)<br>
+             <strong>Menulis:</strong> <code>article</code>, <code>revision_count</code> (saat revisi)</p>
+          <p style="color:var(--muted);font-size:.9rem">Prompt: <code>GENERATOR_PROMPT</code> + <code>GENERATOR_REVISION_PROMPT</code></p>
+        </div>
+        <div class="card">
+          <span class="badge b-llm">LLM</span><h3>EvaluatorAgent</h3>
+          <p>Menilai artikel (kejelasan, struktur, relevansi, kelengkapan, keterbacaan). Memakai
+             <code>with_structured_output(EvaluationResult)</code> sehingga jawabannya berupa objek
+             <code>score</code>, <code>feedback</code>, <code>approved</code>, bukan teks bebas.</p>
+          <p><strong>Membaca:</strong> <code>article</code><br><strong>Menulis:</strong> <code>feedback</code>, <code>approved</code></p>
+          <p style="color:var(--muted);font-size:.9rem"><code>score</code> dihasilkan tetapi tidak disimpan di state.</p>
+        </div>
+        <div class="card">
+          <span class="badge b-llm">LLM</span><h3>ImagePromptAgent</h3>
+          <p>Menulis prompt gambar cover (bahasa Inggris, tanpa teks di gambar) dari artikel yang sudah disetujui evaluator.</p>
+          <p><strong>Membaca:</strong> <code>topic</code>, <code>article</code><br><strong>Menulis:</strong> <code>image_prompt</code></p>
+          <p style="color:var(--muted);font-size:.9rem">Gambarnya sendiri belum dibuat.</p>
+        </div>
+        <div class="card">
+          <span class="badge b-human">Manusia</span><h3>human_review_node</h3>
+          <p>Bukan agent LLM. Memanggil <code>interrupt()</code> sehingga graph berhenti dan menunggu jawaban Anda.</p>
+          <p><strong>Membaca:</strong> <code>article</code>, <code>image_prompt</code><br><strong>Menulis:</strong> <code>human_approved</code></p>
+        </div>
+        <div class="card">
+          <span class="badge b-plain">Biasa</span><h3>save_node</h3>
+          <p>Bukan agent. Menulis artikel ke <code>output/</code> lewat <code>services/storage.py</code>.</p>
+          <p><strong>Membaca:</strong> <code>topic</code>, <code>article</code><br><strong>Menulis:</strong> <code>output_path</code></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== STATE ===================== -->
+    <section id="state">
+      <h2>State bersama (<code>ArticleState</code>)</h2>
+      <p>
+        Semua node berbagi satu state. Hanya <code>topic</code> yang wajib; field lain
+        <code>NotRequired</code> karena baru terisi setelah node tertentu berjalan.
+      </p>
+      <div class="card" style="padding:8px 12px">
+        <table class="state">
+          <thead><tr><th>Field</th><th>Tipe</th><th>Diisi oleh</th><th>Keterangan</th></tr></thead>
+          <tbody>
+            <tr><td><code>topic</code></td><td>str</td><td>input (main.py)</td><td>Topik artikel. Satu-satunya field wajib.</td></tr>
+            <tr><td><code>outline</code></td><td>str</td><td>orchestrator</td><td>Kerangka artikel.</td></tr>
+            <tr><td><code>article</code></td><td>str</td><td>generator</td><td>Draft artikel Markdown; ditimpa saat revisi.</td></tr>
+            <tr><td><code>feedback</code></td><td>str</td><td>evaluator</td><td>Masukan evaluator; dipakai generator saat revisi.</td></tr>
+            <tr><td><code>approved</code></td><td>bool</td><td>evaluator</td><td>Keputusan evaluator (otomatis).</td></tr>
+            <tr><td><code>revision_count</code></td><td>int</td><td>generator</td><td>Berapa kali sudah direvisi; membatasi loop.</td></tr>
+            <tr><td><code>image_prompt</code></td><td>str</td><td>image_prompt</td><td>Prompt gambar cover.</td></tr>
+            <tr><td><code>human_approved</code></td><td>bool</td><td>human_review</td><td>Keputusan Anda (manusia).</td></tr>
+            <tr><td><code>output_path</code></td><td>str</td><td>save</td><td>Lokasi file Markdown hasil simpan.</td></tr>
+            <tr><td><code>image_path</code></td><td>str</td><td>(belum ada)</td><td>Dicadangkan untuk gambar hasil generate.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===================== KODE BERANOTASI ===================== -->
+    <section id="kode">
+      <h2>Kode beranotasi</h2>
+      <p>
+        Cuplikan file penting dengan komentar penjelasan (warna hijau). Pilih tab untuk berpindah file.
+        Ini cuplikan yang disederhanakan dari kode asli; file di folder proyek tetap yang utama.
+      </p>
+      <div class="tabs" role="tablist" id="code-tabs"></div>
+      <div class="code-info" id="code-info"></div>
+      <pre class="code" id="code-view" tabindex="0"></pre>
+    </section>
+
+    <!-- ===================== KONSEP ===================== -->
+    <section id="konsep">
+      <h2>Konsep LangGraph yang dipakai</h2>
+      <details open><summary>StateGraph, node, dan edge</summary>
+        <p><code>StateGraph(ArticleState)</code> adalah graph yang berbagi satu state. <strong>Node</strong> = fungsi
+          <code>state → perubahan state</code>. <strong>Edge</strong> = urutan eksekusi; <code>add_edge(a, b)</code>
+          berarti setelah <code>a</code> selalu <code>b</code>. <code>START</code> dan <code>END</code> adalah titik awal dan akhir.</p></details>
+      <details><summary>Partial update</summary>
+        <p>Node tidak perlu mengembalikan seluruh state; cukup field yang berubah. LangGraph menggabungkannya
+          ke state (secara default field ditimpa nilai baru).</p></details>
+      <details><summary>Conditional edge &amp; router</summary>
+        <p><code>add_conditional_edges(node, router, {label: tujuan})</code>: setelah <code>node</code>, fungsi router
+          dipanggil dengan state terbaru dan mengembalikan sebuah label; peta menerjemahkan label itu ke node tujuan.
+          Tujuan boleh node sebelumnya, itulah cara membuat <strong>loop revisi</strong>. Counter
+          <code>revision_count</code> mencegah loop tanpa akhir.</p></details>
+      <details><summary>Checkpointer &amp; thread_id</summary>
+        <p>Checkpointer menyimpan snapshot state setelah tiap langkah. Di proyek ini dipakai <code>SqliteSaver</code>
+          (<code>memory/checkpoints.db</code>), jadi data bertahan setelah program selesai.
+          <code>thread_id</code> adalah nama sesi: checkpoint dengan id sama dianggap satu run yang berlanjut.
+          <code>get_state_history()</code> membaca semua snapshot.</p></details>
+      <details><summary>Streaming (<code>stream_mode="updates"</code>)</summary>
+        <p><code>stream()</code> menghasilkan item setiap kali sebuah node selesai: <code>{nama_node: field_yang_diubah}</code>.
+          Berbeda dengan <code>invoke()</code> yang hanya mengembalikan hasil akhir. <code>stream()</code> tidak
+          mengembalikan state akhir; ambil lewat <code>get_state(config).values</code>.</p></details>
+      <details><summary>Human-in-the-loop: <code>interrupt</code> &amp; <code>Command(resume)</code></summary>
+        <p><code>interrupt(payload)</code> di dalam node menghentikan graph dan mengirim <code>payload</code> ke pemanggil
+          (di stream muncul sebagai item berkunci <code>"__interrupt__"</code>). Pemanggil melanjutkan dengan
+          <code>Command(resume=nilai)</code> pada <code>thread_id</code> yang sama; <code>nilai</code> menjadi hasil
+          kembalian <code>interrupt()</code>. Wajib ada checkpointer.</p>
+        <p><strong>Penting:</strong> saat dilanjutkan, node dijalankan ulang dari baris pertama, jadi jangan taruh
+          efek samping sebelum <code>interrupt()</code>.</p></details>
+    </section>
+
+    <!-- ===================== CATATAN PENTING ===================== -->
+    <section id="catatan">
+      <h2>Catatan penting</h2>
+      <div class="note"><strong>Satu <code>thread_id</code> baru per run.</strong> Jika thread lama dipakai ulang, nilai lama
+        (<code>feedback</code>, <code>revision_count</code>, …) masih ada di state dan terbawa ke run baru, sehingga draft pertama
+        bisa salah dianggap revisi. <code>main.py</code> membuat id baru lewat <code>uuid4()</code> setiap dijalankan.</div>
+      <div class="note"><strong>Jatah revisi habis = tidak disimpan.</strong> Jika evaluator menolak sampai
+        <code>MAX_REVISIONS</code> (2) terlampaui, workflow berhenti di <code>END</code> tanpa menyimpan apa pun. Ubah rute
+        <code>max_revisions</code> ke <code>save</code> bila ingin draft terakhir tetap tersimpan.</div>
+      <div class="note"><strong>Graph selalu berhenti di <code>human_review</code>.</strong> Memanggil <code>invoke</code>/<code>stream</code>
+        tanpa <code>Command(resume=...)</code> tidak akan sampai ke <code>save</code>. Tes yang menjalankan graph penuh harus melanjutkan dengan
+        <code>Command(resume=True)</code>.</div>
+      <ul>
+        <li><strong>Dua keputusan "approved" berbeda:</strong> <code>approved</code> dari evaluator (LLM) dan <code>human_approved</code> dari Anda.</li>
+        <li><strong>Tes memakai agent palsu</strong> dengan mengganti nama di <code>graph.nodes</code> (mis. <code>nodes.GeneratorAgent = Fake</code>), karena node memanggil nama itu saat dijalankan.</li>
+        <li><strong>Prompt memakai <code>str.format()</code></strong>: jangan tulis <code>{ }</code> literal di template (tulis <code>{{ }}</code>).</li>
+        <li><strong><code>memory/checkpoints.db</code></strong> di-ignore git (<code>memory/*.db*</code>) dan dibuat otomatis.</li>
+        <li><strong>Bahasa prompt campur:</strong> generator berbahasa Indonesia, lainnya Inggris.</li>
+        <li><strong><code>agents/generator.py</code> dan <code>orchestrator.py</code></strong> memberi anotasi <code>BaseChatModel</code> tanpa meng-import-nya (tetap jalan, tetapi bisa dirapikan seperti di <code>image_prompt.py</code>).</li>
+      </ul>
+      <h3>Belum ada / ide latihan berikutnya</h3>
+      <ul>
+        <li>Membuat gambar sungguhan dari <code>image_prompt</code> lalu mengisi <code>image_path</code> (butuh model image generation).</li>
+        <li>Menyertakan <code>image_prompt</code> di file Markdown yang disimpan.</li>
+        <li>Memberi manusia pilihan "revisi dengan catatan" (kembali ke generator), bukan hanya setuju/tolak.</li>
+      </ul>
+    </section>
+
+  </main>
+</div>
+
+<!-- ============================================================
+     SUMBER KODE untuk tab "Kode beranotasi".
+     Disimpan sebagai text/plain agar tidak perlu escape karakter < > &.
+     JavaScript di bawah membaca isinya lewat textContent.
+     ============================================================ -->
+
+<script type="text/plain" id="code-state" data-title="graph/state.py" data-info="Bentuk data yang dibagi semua node.">
+from typing import TypedDict
+from typing_extensions import NotRequired
+
+
+class ArticleState(TypedDict):
+    # TypedDict = "kamus" dengan kunci dan tipe yang sudah ditentukan.
+    # Field tanpa NotRequired WAJIB ada saat graph dimulai.
+    topic: str  # satu-satunya input wajib dari user
+
+    # NotRequired = baru terisi setelah node tertentu berjalan.
+    outline: NotRequired[str]  # diisi OrchestratorAgent
+    article: NotRequired[str]  # diisi GeneratorAgent (ditimpa saat revisi)
+    feedback: NotRequired[str]  # diisi EvaluatorAgent, dibaca GeneratorAgent saat revisi
+    approved: NotRequired[bool]  # keputusan EVALUATOR (otomatis)
+
+    human_approved: NotRequired[bool]  # keputusan MANUSIA di human_review
+    revision_count: NotRequired[int]  # penghitung revisi; membatasi loop
+
+    image_prompt: NotRequired[str]  # prompt gambar cover
+    image_path: NotRequired[str]  # (belum dipakai) lokasi gambar hasil generate
+    output_path: NotRequired[str]  # lokasi file .md yang disimpan
+</script>
+
+<script type="text/plain" id="code-workflow" data-title="graph/workflow.py" data-info="Merakit node dan edge menjadi graph yang bisa dijalankan.">
+def create_workflow(checkpointer=None):
+    # StateGraph = graph yang berbagi satu state (ArticleState) antar node.
+    workflow = StateGraph(ArticleState)
+
+    # Daftarkan node: nama (string) -> fungsi node.
+    # Nama inilah yang dipakai di edge dan di peta conditional edge.
+    workflow.add_node("orchestrator", orchestrator_node)
+    workflow.add_node("generator", generator_node)
+    workflow.add_node("evaluator", evaluator_node)
+    workflow.add_node("image_prompt", image_prompt_node)
+    workflow.add_node("human_review", human_review_node)
+    workflow.add_node("save", save_node)
+
+    # Edge biasa: urutan tetap, tanpa percabangan.
+    workflow.add_edge(START, "orchestrator")
+    workflow.add_edge("orchestrator", "generator")
+    workflow.add_edge("generator", "evaluator")
+
+    # Conditional edge #1: setelah evaluator, route_after_evaluation(state)
+    # mengembalikan sebuah label; dictionary memetakan label ke node tujuan.
+    workflow.add_conditional_edges(
+        "evaluator",
+        route_after_evaluation,
+        {
+            "approved": "image_prompt",  # evaluator puas -> lanjut
+            "rejected": "generator",  # LOOP: kembali ke node sebelumnya
+            "max_revisions": END,  # jatah revisi habis -> berhenti
+        },
+    )
+
+    workflow.add_edge("image_prompt", "human_review")
+
+    # Conditional edge #2: keputusan manusia.
+    workflow.add_conditional_edges(
+        "human_review",
+        route_after_human_review,
+        {"approved": "save", "rejected": END},
+    )
+
+    workflow.add_edge("save", END)
+
+    # compile() mengubah definisi menjadi objek yang bisa di-invoke()/stream().
+    # Checkpointer dipasang di sini; None = tanpa penyimpanan state.
+    return workflow.compile(checkpointer=checkpointer)
+</script>
+
+<script type="text/plain" id="code-router" data-title="graph/router.py" data-info="Fungsi router: membaca state, mengembalikan LABEL cabang (bukan nama node).">
+MAX_REVISIONS = 2  # batas revisi agar loop generator <-> evaluator tidak tanpa akhir
+
+
+def route_after_evaluation(state):
+    # Router hanya MEMBACA state dan mengembalikan string label.
+    # Peta label -> node ada di workflow.py.
+    if state["approved"]:
+        return "approved"
+
+    # state.get(..., 0): revision_count belum ada pada draft pertama.
+    if state.get("revision_count", 0) >= MAX_REVISIONS:
+        return "max_revisions"
+
+    return "rejected"  # masih ada jatah -> kembali ke generator
+
+
+def route_after_human_review(state):
+    if state["human_approved"]:
+        return "approved"  # -> save
+
+    return "rejected"  # -> END tanpa menyimpan
+</script>
+
+<script type="text/plain" id="code-generator" data-title="agents/generator.py" data-info="Satu class untuk menulis draft sekaligus merevisinya.">
+class GeneratorAgent:
+    def __init__(self):
+        self.llm = get_llm()  # LLM dibuat di config/llm.py (OpenRouter)
+
+    def run(self, state):
+        topic = state["topic"]
+        outline = state["outline"]  # [] pasti ada: orchestrator berjalan lebih dulu
+
+        # .get() dipakai karena pada draft pertama field ini belum ada.
+        feedback = state.get("feedback")
+        previous_article = state.get("article")
+
+        # Ada feedback + draft lama = artikel ditolak evaluator -> mode REVISI.
+        is_revision = bool(feedback and previous_article)
+
+        # Template prompt ada di prompts/article_prompts.py.
+        prompt = GENERATOR_PROMPT.format(topic=topic, outline=outline)
+
+        if is_revision:
+            # Tambahkan draft lama + feedback ke akhir prompt.
+            prompt += GENERATOR_REVISION_PROMPT.format(
+                previous_article=previous_article,
+                feedback=feedback,
+            )
+
+        response = self.llm.invoke(prompt)
+
+        # Partial update: hanya field yang berubah.
+        update = {"article": response.content}
+
+        if is_revision:
+            # Router membaca counter ini untuk menghentikan loop revisi.
+            update["revision_count"] = state.get("revision_count", 0) + 1
+
+        return update
+</script>
+
+<script type="text/plain" id="code-evaluator" data-title="agents/evaluator.py" data-info="Output terstruktur: LLM dipaksa menjawab sesuai model EvaluationResult.">
+class EvaluationResult(BaseModel):  # models/evaluation.py
+    score: int  # 1-10 (tidak disimpan di state)
+    feedback: str  # masukan singkat dan bisa ditindaklanjuti
+    approved: bool  # layak diterima atau tidak
+
+
+class EvaluatorAgent:
+    def __init__(self):
+        self.llm = get_llm()
+        # with_structured_output: jawaban LLM otomatis di-parse menjadi
+        # objek EvaluationResult, jadi tidak perlu mem-parse teks sendiri.
+        self.structured_llm = self.llm.with_structured_output(EvaluationResult)
+
+    def run(self, state):
+        prompt = EVALUATOR_PROMPT.format(article=state["article"])
+
+        result = self.structured_llm.invoke(prompt)  # result = EvaluationResult
+
+        # Hanya dua field yang masuk state; node berikutnya (router) membaca approved.
+        return {
+            "feedback": result.feedback,
+            "approved": result.approved,
+        }
+</script>
+
+<script type="text/plain" id="code-nodes" data-title="graph/nodes.py" data-info="Node tipis, plus dua node non-LLM: human_review dan save.">
+def generator_node(state):
+    # Pola node agent: buat agent, panggil run, kembalikan hasilnya.
+    return GeneratorAgent().run(state)
+
+
+def human_review_node(state):
+    # interrupt() MENGHENTIKAN graph di sini dan mengirim payload ke pemanggil.
+    # Graph baru lanjut saat pemanggil memakai Command(resume=...).
+    #
+    # PENTING: saat dilanjutkan, node ini dijalankan ULANG dari baris pertama.
+    # Jangan taruh efek samping (tulis file, kirim request) sebelum interrupt().
+    decision = interrupt(
+        {
+            "pesan": "Setujui artikel ini untuk disimpan?",
+            "article": state["article"],
+            "image_prompt": state.get("image_prompt", ""),
+        }
+    )
+
+    # decision = nilai dari Command(resume=...), di sini True/False.
+    return {"human_approved": bool(decision)}
+
+
+def save_node(state):
+    # Node tanpa LLM: cukup fungsi biasa yang memanggil service.
+    path = save_article(state["topic"], state["article"])
+
+    return {"output_path": path}  # partial update
+</script>
+
+<script type="text/plain" id="code-main" data-title="main.py" data-info="Menjalankan graph dengan streaming, menangani interrupt, lalu melanjutkan.">
+def run_stream(workflow, graph_input, config):
+    # graph_input: state awal (run baru) ATAU Command(resume=...) (melanjutkan).
+    # stream_mode="updates": tiap item = {nama_node: field_yang_diubah}.
+    for update in workflow.stream(graph_input, config, stream_mode="updates"):
+
+        # Saat interrupt(), stream menghasilkan item khusus berkunci "__interrupt__".
+        if "__interrupt__" in update:
+            return update["__interrupt__"][0].value  # payload dari interrupt()
+
+        for node_name, changes in update.items():
+            print(f"[{node_name}] selesai, mengubah: {sorted(changes)}")
+
+    return None  # None = graph selesai
+
+
+def main():
+    # Koneksi SQLite ditutup otomatis saat keluar dari blok `with`.
+    with SqliteSaver.from_conn_string(str(DB_PATH)) as checkpointer:
+        workflow = create_workflow(checkpointer=checkpointer)
+
+        # thread_id baru tiap run, supaya state run lama tidak terbawa.
+        config = {"configurable": {"thread_id": str(uuid.uuid4())}}
+
+        pending = run_stream(workflow, {"topic": "Agentic AI in 2027"}, config)
+
+        # Selama graph berhenti karena interrupt: tanya manusia, lalu resume.
+        while pending is not None:
+            approved = ask_approval(pending)  # input() y/n di terminal
+            pending = run_stream(workflow, Command(resume=approved), config)
+
+        # stream() tidak mengembalikan state akhir; ambil dari checkpointer.
+        final_state = workflow.get_state(config).values
+</script>
+
+<script type="text/plain" id="code-storage" data-title="services/storage.py" data-info="Menyimpan artikel ke file Markdown, terpisah dari logika graph.">
+OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
+# __file__ = path file ini; .parent.parent = root proyek.
+# Dengan begini lokasi output tidak bergantung pada folder tempat program dijalankan.
+
+
+def slugify(text):
+    # "Agentic AI in 2027!" -> "agentic-ai-in-2027"
+    slug = re.sub(r"[^a-z0-9]+", "-", text.lower())
+    return slug.strip("-") or "artikel"  # cadangan bila topik hanya simbol
+
+
+def save_article(topic, article, output_dir=OUTPUT_DIR):
+    # exist_ok=True: tidak error bila folder sudah ada.
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Timestamp di nama file: run berikutnya tidak menimpa file lama.
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    file_path = output_dir / f"{slugify(topic)}-{timestamp}.md"
+
+    # encoding utf-8 penting di Windows untuk karakter non-ASCII.
+    file_path.write_text(article, encoding="utf-8")
+
+    return str(file_path)  # str (bukan Path) agar state tetap tipe sederhana
+</script>
+
+<script>
+/* ==================================================================
+   JAVASCRIPT HALAMAN INI
+   Bagian: (1) navigasi aktif, (2) tombol salin & checklist,
+   (3) data & diagram workflow, (4) simulator, (5) tab kode.
+   ================================================================== */
+
+/* Helper kecil: ambil elemen, dan bungkus localStorage dalam try/catch
+   karena bisa diblokir browser (mode privat, dsb.). */
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* abaikan */ } },
+};
+
+/* ---------- (1) Sorot menu sidebar sesuai bagian yang sedang dibaca ---------- */
+const links = $$("nav.side a");
+const sections = links.map(a => $(a.getAttribute("href")));
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      links.forEach(a => a.classList.toggle("active", a.getAttribute("href") === "#" + e.target.id));
+    }
+  });
+}, { rootMargin: "-20% 0px -70% 0px" });  // aktif saat bagian berada di area atas layar
+sections.forEach(s => s && observer.observe(s));
+
+/* ---------- (2a) Tombol "Salin" pada setiap perintah ---------- */
+$$(".cmd button[data-copy]").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    const text = $("code", btn.parentElement).textContent;
+    try { await navigator.clipboard.writeText(text); btn.textContent = "Tersalin ✓"; }
+    catch (e) { btn.textContent = "Salin manual"; }
+    setTimeout(() => (btn.textContent = "Salin"), 1500);
+  });
+});
+
+/* ---------- (2b) Checklist langkah memulai (diingat di browser) ---------- */
+/* "> li" = hanya item langkah utama, bukan <li> bersarang di dalamnya. */
+$$("#steps > li").forEach(li => {
+  const key = "step-" + li.dataset.step;
+  const box = $("input[type=checkbox]", li);
+  box.checked = store.get(key) === "1";
+  li.classList.toggle("done", box.checked);
+  box.addEventListener("change", () => {
+    li.classList.toggle("done", box.checked);
+    store.set(key, box.checked ? "1" : "0");
+  });
+});
+
+/* ---------- (3) Data node: isi panel detail saat node diklik ---------- */
+const NODES = {
+  START: { type: "ctrl", title: "START", desc: "Titik awal graph. Menerima state awal, yaitu {topic}.", reads: "-", writes: "topic (dari main.py)", file: "graph/workflow.py" },
+  orchestrator: { type: "llm", title: "orchestrator", desc: "LLM membuat outline artikel dari topik.", reads: "topic", writes: "outline", file: "agents/orchestrator.py" },
+  generator: { type: "llm", title: "generator", desc: "LLM menulis artikel Markdown. Jika ada feedback dan draft lama, ia merevisi draft itu dan menaikkan revision_count.", reads: "topic, outline, (article, feedback, revision_count)", writes: "article, revision_count (saat revisi)", file: "agents/generator.py" },
+  evaluator: { type: "llm", title: "evaluator", desc: "LLM menilai artikel dengan output terstruktur. Hasilnya menentukan cabang: approved / rejected / max_revisions.", reads: "article", writes: "feedback, approved", file: "agents/evaluator.py + graph/router.py" },
+  image_prompt: { type: "llm", title: "image_prompt", desc: "LLM menulis prompt gambar cover dari artikel yang sudah disetujui evaluator.", reads: "topic, article", writes: "image_prompt", file: "agents/image_prompt.py" },
+  human_review: { type: "human", title: "human_review", desc: "Graph BERHENTI lewat interrupt(). main.py menampilkan artikel dan menanyakan y/n; jawaban dikirim dengan Command(resume=...).", reads: "article, image_prompt", writes: "human_approved", file: "graph/nodes.py + main.py" },
+  save: { type: "plain", title: "save", desc: "Menulis artikel ke output/<slug>-<waktu>.md. Bukan node LLM.", reads: "topic, article", writes: "output_path", file: "services/storage.py" },
+  END: { type: "ctrl", title: "END", desc: "Titik akhir graph. Dicapai dari tiga jalur: save selesai, evaluator max_revisions, atau manusia menolak.", reads: "-", writes: "-", file: "-" },
+};
+
+/* Tata letak diagram: koordinat tengah (cx, cy) tiap node dalam viewBox 640x520. */
+const POS = {
+  START: [250, 28], orchestrator: [250, 90], generator: [250, 160], evaluator: [250, 230],
+  image_prompt: [250, 320], human_review: [250, 390], save: [250, 460], END: [520, 460],
+};
+const W = 150, H = 40;  // ukuran kotak node
+
+/* Daftar edge: [dari, ke, apakah conditional, label, jalur khusus (opsional)]. */
+const EDGES = [
+  ["START", "orchestrator", false, ""],
+  ["orchestrator", "generator", false, ""],
+  ["generator", "evaluator", false, ""],
+  ["evaluator", "image_prompt", true, "approved"],
+  ["evaluator", "generator", true, "rejected", "back"],      // loop revisi (melengkung ke kiri)
+  ["evaluator", "END", true, "max_revisions", "toEnd"],      // jatah revisi habis
+  ["image_prompt", "human_review", false, ""],
+  ["human_review", "save", true, "approved"],
+  ["human_review", "END", true, "rejected", "toEnd2"],       // manusia menolak
+  ["save", "END", false, ""],
+];
+
+/* Hitung path SVG untuk sebuah edge. Kembalikan {d, lx, ly} (path + posisi label). */
+function edgePath(from, to, kind) {
+  const [x1, y1] = POS[from], [x2, y2] = POS[to];
+  if (kind === "back") {
+    // kiri node evaluator -> kiri node generator, melengkung keluar
+    return { d: `M${x1 - W / 2},${y1} C${x1 - 140},${y1} ${x2 - 140},${y2} ${x2 - W / 2},${y2}`, lx: x1 - 125, ly: (y1 + y2) / 2 + 4 };
+  }
+  if (kind === "toEnd") {
+    // evaluator -> END: dari sisi kanan, melengkung ke atas END
+    return { d: `M${x1 + W / 2},${y1} C${520},${y1} ${520},${y1 + 60} ${x2},${y2 - 16}`, lx: 470, ly: y1 + 40 };
+  }
+  if (kind === "toEnd2") {
+    return { d: `M${x1 + W / 2},${y1} C${420},${y1} ${520},${y2 - 90} ${x2},${y2 - 16}`, lx: 440, ly: y1 - 18 };
+  }
+  if (from === "save") {   // horizontal ke END
+    return { d: `M${x1 + W / 2},${y1} L${x2 - 45},${y2}`, lx: (x1 + x2) / 2 + 20, ly: y1 - 6 };
+  }
+  // garis lurus dari tepi bawah node asal ke tepi atas node tujuan
+  const y1e = y1 + H / 2 - (from === "START" ? 6 : 0), y2e = y2 - H / 2 + (to === "END" ? 4 : 0);
+  return { d: `M${x1},${y1e} L${x2},${y2e}`, lx: x1 + 8, ly: (y1e + y2e) / 2 + 4 };
+}
+
+/* Gambar diagram ke dalam <svg id="wf">. */
+const svg = $("#wf");
+const NS = "http://www.w3.org/2000/svg";
+function el(tag, attrs = {}, text) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+// Definisi kepala panah (marker) yang dipakai semua garis.
+const defs = el("defs");
+const marker = el("marker", { id: "arrow", viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "7", markerHeight: "7", orient: "auto-start-reverse" });
+marker.appendChild(el("path", { d: "M0,0 L10,5 L0,10 z", fill: "currentColor" }));
+defs.appendChild(marker);
+svg.appendChild(defs);
+svg.style.color = "var(--muted)";   // warna kepala panah mengikuti tema
+
+const edgeEls = {};   // simpan elemen edge agar bisa disorot saat simulasi
+EDGES.forEach(([from, to, cond, label, kind]) => {
+  const { d, lx, ly } = edgePath(from, to, kind);
+  const p = el("path", { d, class: "edge" + (cond ? " cond" : ""), "marker-end": "url(#arrow)" });
+  svg.appendChild(p);
+  edgeEls[from + ">" + to] = p;
+  if (label) svg.appendChild(el("text", { x: lx, y: ly, class: "lbl" }, label));
+});
+
+const nodeEls = {};   // simpan elemen node agar bisa disorot/dipilih
+Object.keys(NODES).forEach(name => {
+  const [cx, cy] = POS[name];
+  const n = NODES[name];
+  const g = el("g", { class: "node " + n.type, tabindex: "0", role: "button", "aria-label": "Node " + name });
+  if (n.type === "ctrl") {
+    g.appendChild(el("ellipse", { cx, cy, rx: 42, ry: 15 }));
+  } else {
+    g.appendChild(el("rect", { x: cx - W / 2, y: cy - H / 2, width: W, height: H, rx: 8 }));
+  }
+  g.appendChild(el("text", { x: cx, y: cy + 4, "text-anchor": "middle" }, name));
+  g.addEventListener("click", () => selectNode(name));
+  g.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectNode(name); } });
+  svg.appendChild(g);
+  nodeEls[name] = g;
+});
+
+/* Tampilkan detail node yang dipilih di panel kanan. */
+const BADGE = { llm: ["b-llm", "Memanggil LLM"], plain: ["b-plain", "Node biasa"], human: ["b-human", "Menunggu manusia"], ctrl: ["b-ctrl", "Titik kontrol"] };
+function selectNode(name) {
+  Object.values(nodeEls).forEach(g => g.classList.remove("sel"));
+  nodeEls[name].classList.add("sel");
+  const n = NODES[name];
+  const [cls, txt] = BADGE[n.type];
+  $("#detail").innerHTML =
+    `<h3>${n.title}</h3><span class="badge ${cls}">${txt}</span><p style="margin-top:8px">${n.desc}</p>` +
+    `<dl><dt>Membaca dari state</dt><dd>${n.reads}</dd>` +
+    `<dt>Menulis ke state</dt><dd>${n.writes}</dd>` +
+    `<dt>File</dt><dd><code>${n.file}</code></dd></dl>`;
+}
+selectNode("generator");   // pilihan awal
+
+/* ---------- (4) Simulator ---------- */
+const MAX_REVISIONS = 2;   // sama dengan graph/router.py
+const FIELDS = ["topic", "outline", "article", "feedback", "approved", "revision_count", "image_prompt", "human_approved", "output_path"];
+
+/* Bangun daftar langkah simulasi dari pilihan pengguna.
+   Tiap langkah: node yang berjalan, perubahan state, catatan, dan snapshot state. */
+function buildSteps(rejects, humanYes) {
+  const steps = [];
+  let st = { topic: "Agentic AI in 2027" };
+  // push(): terapkan perubahan ke state (seperti LangGraph menggabungkan partial update) dan catat langkahnya.
+  const push = (node, note, changes = {}, edge = null) => {
+    st = { ...st, ...changes };
+    steps.push({ node, note, changes, edge, state: { ...st } });
+  };
+
+  push("START", "Graph dimulai dengan state awal {topic}.");
+  push("orchestrator", "LLM membuat outline.", { outline: "(kerangka artikel)" }, "START>orchestrator");
+  let draft = 1;
+  push("generator", "LLM menulis draft pertama.", { article: "Draft #1" }, "orchestrator>generator");
+
+  let evalCalls = 0;
+  while (true) {
+    evalCalls++;
+    const ok = evalCalls > rejects;   // evaluator menolak sebanyak 'rejects' kali, lalu setuju
+    push("evaluator",
+      ok ? "Evaluator MENYETUJUI artikel." : "Evaluator MENOLAK artikel (feedback diberikan).",
+      { feedback: ok ? "Sudah baik." : "Perbaiki bagian #" + evalCalls, approved: ok },
+      "generator>evaluator");
+    if (ok) break;
+
+    // Router: tolak + jatah revisi habis -> max_revisions -> END.
+    if ((st.revision_count || 0) >= MAX_REVISIONS) {
+      push("END", "Router: revision_count (" + st.revision_count + ") ≥ MAX_REVISIONS → max_revisions. Berhenti TANPA menyimpan.", {}, "evaluator>END");
+      return steps;
+    }
+    // Router: rejected -> kembali ke generator (loop revisi).
+    draft++;
+    push("generator", "Router: rejected → kembali ke generator. Revisi memakai feedback + draft lama.",
+      { article: "Draft #" + draft, revision_count: (st.revision_count || 0) + 1 }, "evaluator>generator");
+  }
+
+  push("image_prompt", "Router: approved → LLM membuat prompt gambar cover.", { image_prompt: "(prompt gambar)" }, "evaluator>image_prompt");
+  push("human_review", "interrupt()! Graph BERHENTI dan menunggu jawaban manusia (y/n).", {}, "image_prompt>human_review");
+  push("human_review", "Manusia menjawab '" + (humanYes ? "y" : "n") + "' → Command(resume=" + (humanYes ? "True" : "False") + ").", { human_approved: humanYes });
+  if (!humanYes) {
+    push("END", "Router: ditolak manusia → berhenti TANPA menyimpan.", {}, "human_review>END");
+    return steps;
+  }
+  push("save", "Router: disetujui → artikel disimpan ke file.", { output_path: "output/agentic-ai-in-2027-….md" }, "human_review>save");
+  push("END", "Selesai.", {}, "save>END");
+  return steps;
+}
+
+let steps = [], idx = -1, timer = null;
+
+/* Gambar ulang tabel state, log, dan sorotan diagram sesuai langkah ke-idx. */
+function renderSim() {
+  const cur = idx >= 0 ? steps[idx] : null;
+  const stNow = cur ? cur.state : {};
+  $("#sim-state").innerHTML =
+    `<tr><th>Field</th><th>Nilai</th></tr>` +
+    FIELDS.map(f => {
+      const has = f in stNow;
+      const changed = cur && f in cur.changes;
+      return `<tr class="${changed ? "changed" : ""}"><td><code>${f}</code></td>` +
+             `<td class="${has ? "" : "empty"}">${has ? String(stNow[f]) : "—"}</td></tr>`;
+    }).join("");
+
+  $("#sim-log").innerHTML = idx < 0
+    ? `<li style="color:var(--muted)">Belum mulai.</li>`
+    : steps.slice(0, idx + 1).map((s, i) => `<li class="${i === idx ? "now" : ""}"><code>${s.node}</code>: ${s.note}</li>`).join("");
+  const log = $("#sim-log"); log.scrollTop = log.scrollHeight;
+
+  // Sorot node dan edge yang sedang aktif di diagram.
+  Object.values(nodeEls).forEach(g => g.classList.remove("active"));
+  Object.values(edgeEls).forEach(p => p.classList.remove("on"));
+  if (cur) {
+    nodeEls[cur.node].classList.add("active");
+    if (cur.edge && edgeEls[cur.edge]) edgeEls[cur.edge].classList.add("on");
+  }
+  const last = idx >= steps.length - 1;
+  $("#sim-next").disabled = last;
+  if (last && timer) stopAuto();
+}
+
+function resetSim() {
+  stopAuto();
+  steps = buildSteps(+$("#sim-rejects").value, $("#sim-human").value === "y");
+  idx = -1;
+  renderSim();
+}
+function stepSim() { if (idx < steps.length - 1) { idx++; renderSim(); } }
+function stopAuto() { clearInterval(timer); timer = null; $("#sim-auto").textContent = "▶ Putar otomatis"; }
+function toggleAuto() {
+  if (timer) { stopAuto(); return; }
+  if (idx >= steps.length - 1) resetSim();   // mulai ulang jika sudah selesai
+  $("#sim-auto").textContent = "⏸ Jeda";
+  timer = setInterval(stepSim, 1000);
+}
+
+$("#sim-next").addEventListener("click", stepSim);
+$("#sim-auto").addEventListener("click", toggleAuto);
+$("#sim-reset").addEventListener("click", resetSim);
+$("#sim-rejects").addEventListener("change", resetSim);
+$("#sim-human").addEventListener("change", resetSim);
+resetSim();
+
+/* ---------- (5) Tab kode beranotasi ---------- */
+const codeBlocks = $$('script[type="text/plain"][id^="code-"]');
+const tabsEl = $("#code-tabs");
+
+/* Ubah teks kode menjadi HTML: escape karakter khusus, lalu beri warna pada komentar (# ...).
+   Catatan: ini penyorot sederhana; cuplikan sengaja tidak memuat tanda # di dalam string. */
+function highlight(code) {
+  const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return code.split("\n").map(line => {
+    const i = line.indexOf("#");
+    if (i === -1) return esc(line);
+    return esc(line.slice(0, i)) + '<span class="c">' + esc(line.slice(i)) + "</span>";
+  }).join("\n");
+}
+
+function showCode(block, btn) {
+  $$("button", tabsEl).forEach(b => b.setAttribute("aria-selected", b === btn ? "true" : "false"));
+  $("#code-info").textContent = block.dataset.info;
+  $("#code-view").innerHTML = highlight(block.textContent.replace(/^\n/, "").trimEnd());
+}
+codeBlocks.forEach((block, i) => {
+  const btn = document.createElement("button");
+  btn.setAttribute("role", "tab");
+  btn.textContent = block.dataset.title;
+  btn.addEventListener("click", () => showCode(block, btn));
+  tabsEl.appendChild(btn);
+  if (i === 0) showCode(block, btn);   // tab pertama tampil lebih dulu
+});
+</script>
+</body>
+</html>

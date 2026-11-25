@@ -1,7 +1,7 @@
 # Article Creation dengan LangGraph
 
 > **Catatan:** repo ini adalah **proyek latihan** untuk belajar LangGraph, bukan proyek produksi.
-> Kodenya sengaja dibuat sederhana dan penuh komentar (bahasa Indonesia) agar mudah dipelajari,
+> Kodenya sengaja dibuat sederhana dan diberi komentar agar mudah dipelajari,
 > dan bisa berubah sewaktu-waktu seiring proses belajar.
 
 Pipeline multi-agent yang membuat artikel blog dari satu topik. Beberapa agent LLM bekerja bergantian
@@ -103,7 +103,7 @@ Tiap file di `tests/` adalah skrip mandiri yang mencetak hasil. Jalankan dari ro
 python -m tests.test_human_review
 ```
 
-Tes yang memakai agent palsu (tanpa LLM): `test_router`, `test_storage`, `test_checkpointer`,
+Tes yang memakai agent tanpa LLM: `test_router`, `test_storage`, `test_checkpointer`,
 `test_sqlite_checkpointer`, `test_streaming`, `test_human_review`.
 Tes yang memanggil LLM sungguhan (butuh `.env` aktif): `test_evaluator`, `test_generator`, `test_image_prompt`.
 

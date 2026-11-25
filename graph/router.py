@@ -9,7 +9,7 @@ def route_after_human_review(state: ArticleState) -> str:
     Menentukan node berikutnya setelah keputusan manusia.
 
     - "approved" : disetujui manusia -> simpan
-    - "rejected" : ditolak manusia -> selesai tanpa menyimpan
+    - "rejected" : ditolak manusia -> kembali ke generator untuk menulis ulang
     """
     if state["human_approved"]:
         return "approved"

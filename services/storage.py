@@ -33,9 +33,47 @@ def slugify(text: str) -> str:
     return slug.strip("-") or "artikel"
 
 
-def save_article(topic: str, article: str, output_dir: Path = OUTPUT_DIR) -> str:
+def build_document(
+    topic: str,
+    article: str,
+    outline: str | None = None,
+    image_prompt: str | None = None,
+) -> str:
     """
-    Simpan artikel sebagai file Markdown, lalu kembalikan path file-nya.
+    Susun isi file Markdown: catatan (topik, outline, prompt gambar),
+    pemisah, lalu artikel.
+
+    Dipisah dari save_article agar mudah dites tanpa menulis file.
+    """
+    # Bagian catatan selalu memuat topik; outline dan prompt gambar
+    # hanya ditulis jika ada.
+    notes = f"## Catatan\n\n**Topik:** {topic}\n"
+
+    if outline:
+        notes += f"\n### Outline\n\n{outline.strip()}\n"
+
+    if image_prompt:
+        notes += f"\n### Prompt Gambar\n\n{image_prompt.strip()}\n"
+
+    # "---" = garis pemisah Markdown antara catatan dan artikel.
+    return f"{notes}\n---\n\n{article.strip()}\n"
+
+
+def save_article(
+    topic: str,
+    article: str,
+    output_dir: Path = OUTPUT_DIR,
+    *,
+    outline: str | None = None,
+    image_prompt: str | None = None,
+) -> str:
+    """
+    Simpan artikel (beserta catatan topik, outline, dan prompt gambar)
+    sebagai file Markdown, lalu kembalikan path file-nya.
+
+    Tanda `*` membuat outline dan image_prompt hanya bisa diberikan sebagai
+    keyword (outline=..., image_prompt=...), sehingga urutan argumen posisi
+    lama tidak berubah.
 
     Nama file: <slug-topik>-<tanggal-jam>.md, sehingga menjalankan
     workflow berkali-kali tidak saling menimpa file lama.
@@ -50,7 +88,7 @@ def save_article(topic: str, article: str, output_dir: Path = OUTPUT_DIR) -> str
 
     # encoding utf-8 penting di Windows agar karakter non-ASCII
     # (mis. tanda kutip melengkung, emoji) tidak error.
-    file_path.write_text(article, encoding="utf-8")
+    file_path.write_text(build_document(topic, article, outline, image_prompt), encoding="utf-8")
 
     # State LangGraph sebaiknya berisi tipe sederhana, jadi kita simpan str.
     return str(file_path)

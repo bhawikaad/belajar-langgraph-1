@@ -41,7 +41,7 @@ def main():
     nodes.ImagePromptAgent = FakeImagePrompt
 
     with tempfile.TemporaryDirectory() as tmp:
-        nodes.save_article = lambda topic, article: save_article(topic, article, Path(tmp))
+        nodes.save_article = lambda topic, article, **extra: save_article(topic, article, Path(tmp), **extra)
         db_path = str(Path(tmp) / "tes.db")
         config = {"configurable": {"thread_id": "tes-sqlite"}}
 

@@ -43,14 +43,48 @@ def run_stream(workflow, graph_input, config):
     return None
 
 
-def ask_approval(payload: dict) -> bool:
-    """Tampilkan artikel di terminal dan minta jawaban y/n dari manusia."""
+def ask_approval(payload: dict) -> dict:
+    """
+    Tampilkan artikel di terminal dan minta keputusan dari manusia.
+
+    Mengembalikan {"approved": True} jika setuju, atau
+    {"approved": False, "note": "..."} jika menolak (artikel akan ditulis
+    ulang; catatan opsional dikirim ke penulis sebagai feedback).
+    """
     print("\n=== MENUNGGU PERSETUJUAN ===")
     print(payload["article"])
     print("\nPrompt gambar:", payload["image_prompt"])
 
     answer = input(f"\n{payload['pesan']} (y/n): ").strip().lower()
-    return answer == "y"
+    if answer == "y":
+        return {"approved": True}
+
+    # Selain "y" dianggap menolak -> graph kembali ke generator.
+    note = input("Catatan perbaikan untuk penulis (opsional, Enter untuk lewati): ").strip()
+    print("Artikel ditolak, menulis ulang...\n")
+    return {"approved": False, "note": note}
+
+
+def ask_topic() -> str | None:
+    """
+    Tanyakan topik artikel ke user lewat terminal.
+
+    Input kosong (hanya spasi/Enter) ditolak dan ditanya lagi. Mengembalikan
+    None jika user membatalkan (Ctrl+C) atau input sudah habis (EOF),
+    misalnya program dijalankan tanpa terminal interaktif.
+    """
+    while True:
+        try:
+            # .strip() membuang spasi di awal/akhir agar "   " dianggap kosong.
+            topic = input("Silakan masukkan topik artikel: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nDibatalkan.")
+            return None
+
+        if topic:
+            return topic
+
+        print("Topik tidak boleh kosong, coba lagi.")
 
 
 def main() -> None:
@@ -70,8 +104,13 @@ def main() -> None:
             print_history(workflow, config)
             return
 
+        # Topik diminta dari user saat program jalan (tidak lagi hardcoded).
+        topic = ask_topic()
+        if topic is None:
+            return
+
         initial_state = {
-            "topic": "Agentic AI in 2027"
+            "topic": topic
         }
 
         # thread_id = "nama sesi" untuk checkpoint. Semua checkpoint dengan
@@ -94,11 +133,13 @@ def main() -> None:
         pending = run_stream(workflow, initial_state, config)
 
         # Selama graph berhenti karena interrupt(), tanyakan keputusan ke
-        # manusia lalu lanjutkan graph dengan Command(resume=jawaban).
-        # Loop dipakai karena satu run bisa berhenti lebih dari sekali.
+        # manusia lalu lanjutkan graph dengan Command(resume=keputusan).
+        # Loop dipakai karena satu run bisa berhenti lebih dari sekali:
+        # tiap kali manusia menolak, artikel ditulis ulang dan kembali
+        # menunggu persetujuan sampai manusia menjawab "y".
         while pending is not None:
-            approved = ask_approval(pending)
-            pending = run_stream(workflow, Command(resume=approved), config)
+            decision = ask_approval(pending)
+            pending = run_stream(workflow, Command(resume=decision), config)
 
         # stream() tidak mengembalikan state akhir; ambil dari checkpointer.
         final_state = workflow.get_state(config).values

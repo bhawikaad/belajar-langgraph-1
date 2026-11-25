@@ -66,8 +66,35 @@ def human_review_node(state: ArticleState) -> ArticleState:
         }
     )
 
-    # decision = nilai yang dikirim lewat Command(resume=...), di sini True/False.
-    return {"human_approved": bool(decision)}
+    # decision = nilai yang dikirim lewat Command(resume=...). Bentuk yang
+    # didukung: dict {"approved": bool, "note": str} (dipakai main.py),
+    # atau cukup True/False.
+    if isinstance(decision, dict):
+        approved = bool(decision.get("approved"))
+        note = (decision.get("note") or "").strip()
+    else:
+        approved, note = bool(decision), ""
+
+    if approved:
+        return {"human_approved": True}
+
+    # Ditolak manusia: artikel harus ditulis ulang. Generator memakai field
+    # `feedback` saat merevisi, jadi catatan manusia diletakkan di sana
+    # (menimpa feedback evaluator). Instruksi ini masuk ke prompt, maka
+    # ditulis dalam bahasa Inggris.
+    default_note = (
+        "The reviewer rejected this draft without specific notes. "
+        "Rewrite it with clearer structure, stronger content, and better readability."
+    )
+
+    return {
+        "human_approved": False,
+        "feedback": note or default_note,
+        # Reset agar loop evaluator <-> generator mendapat jatah revisi baru
+        # (kalau tidak, revisi karena penolakan manusia ikut menghabiskan
+        # MAX_REVISIONS dan evaluator bisa langsung berhenti).
+        "revision_count": 0,
+    }
 
 
 def save_node(state: ArticleState) -> ArticleState:
@@ -79,7 +106,14 @@ def save_node(state: ArticleState) -> ArticleState:
     mengembalikan field yang berubah (output_path).
     """
 
-    path = save_article(state["topic"], state["article"])
+    # outline dan image_prompt dikirim sebagai catatan di awal file;
+    # .get() karena field ini NotRequired di state.
+    path = save_article(
+        state["topic"],
+        state["article"],
+        outline=state.get("outline"),
+        image_prompt=state.get("image_prompt"),
+    )
 
     # Return hanya field yang berubah; LangGraph menggabungkannya ke state.
     return {"output_path": path}

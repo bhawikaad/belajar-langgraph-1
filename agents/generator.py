@@ -1,4 +1,5 @@
 from config.llm import get_llm
+from config.settings import settings
 from graph.state import ArticleState
 from prompts.article_prompts import GENERATOR_PROMPT, GENERATOR_REVISION_PROMPT
 
@@ -18,8 +19,13 @@ class GeneratorAgent:
         previous_article = state.get("article")
         is_revision = bool(feedback and previous_article)
 
-        # Template prompt ada di prompts/article_prompts.py.
-        prompt = GENERATOR_PROMPT.format(topic=topic, outline=outline)
+        # Template prompt ada di prompts/article_prompts.py. {language} =
+        # bahasa artikel dari settings (instruksi prompt tetap bahasa Inggris).
+        prompt = GENERATOR_PROMPT.format(
+            topic=topic,
+            outline=outline,
+            language=settings.output_language,
+        )
 
         # Saat revisi, tambahkan instruksi perbaikan di akhir prompt dasar.
         if is_revision:

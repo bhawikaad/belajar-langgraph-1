@@ -59,7 +59,9 @@ def create_workflow(checkpointer=None):
         route_after_human_review,
         {
             "approved": "save",
-            "rejected": END,  # ditolak manusia -> berhenti tanpa menyimpan
+            # ditolak manusia -> tulis ulang (loop ke generator, lalu evaluator
+            # dan human_review lagi sampai manusia menyetujui)
+            "rejected": "generator",
         },
     )
 

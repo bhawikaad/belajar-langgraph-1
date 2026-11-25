@@ -12,11 +12,18 @@ Dengan memisahkan prompt dari kode agent:
 
 Catatan: karena memakai str.format(), jangan tulis kurung kurawal { }
 literal di template (kalau perlu, tulis dua kali: {{ }}).
+
+Bahasa:
+- Semua INSTRUKSI prompt ditulis dalam bahasa Inggris (model biasanya paling
+  patuh pada instruksi berbahasa Inggris).
+- Bahasa HASIL (outline, artikel, feedback) ditentukan terpisah lewat
+  placeholder {language}, yang diisi dari settings.output_language.
+- Prompt gambar sengaja selalu berbahasa Inggris, tanpa {language}.
 """
 
 # ---------------------------------------------------------------
 # Orchestrator: membuat outline dari topik
-# Placeholder: {topic}
+# Placeholder: {topic}, {language}
 # ---------------------------------------------------------------
 ORCHESTRATOR_PROMPT = """
 You are an article planning assistant.
@@ -32,45 +39,48 @@ The outline should:
 - Have a clear conclusion
 - Be suitable as a structure for a full article
 
+Write the outline in {language}.
 Return only the article outline.
 """
 
 # ---------------------------------------------------------------
 # Generator: menulis artikel dari topik + outline
-# Placeholder: {topic}, {outline}
+# Placeholder: {topic}, {outline}, {language}
 # ---------------------------------------------------------------
 GENERATOR_PROMPT = """
-Anda adalah seorang penulis artikel profesional.
+You are a professional article writer.
 
-Buat artikel blog berdasarkan topik dan outline berikut.
+Write a blog article based on the following topic and outline.
 
-Topik:
+Topic:
 {topic}
 
 Outline:
 {outline}
 
-Tulis artikel lengkap dalam format Markdown.
+Write the complete article in {language}, formatted as Markdown.
 """
 
 # Tambahan untuk GENERATOR_PROMPT ketika artikel ditolak dan perlu direvisi.
+# Bahasanya sudah ditentukan oleh GENERATOR_PROMPT, jadi di sini cukup
+# meminta bahasa dan format yang sama.
 # Placeholder: {previous_article}, {feedback}
 GENERATOR_REVISION_PROMPT = """
-Draft sebelumnya ditolak oleh evaluator. Perbaiki draft tersebut
-berdasarkan feedback berikut.
+The previous draft was rejected by a reviewer. Improve that draft
+based on the feedback below.
 
-Draft sebelumnya:
+Previous draft:
 {previous_article}
 
-Feedback evaluator:
+Reviewer feedback:
 {feedback}
 
-Tulis ulang artikel lengkap yang sudah diperbaiki.
+Rewrite the complete, improved article. Keep the same language and Markdown format.
 """
 
 # ---------------------------------------------------------------
 # Evaluator: menilai artikel (output-nya terstruktur, lihat EvaluationResult)
-# Placeholder: {article}
+# Placeholder: {article}, {language}
 # ---------------------------------------------------------------
 EVALUATOR_PROMPT = """
 You are an article evaluator.
@@ -89,7 +99,7 @@ Article:
 
 Return:
 - score: a score from 1 to 10
-- feedback: concise and actionable feedback
+- feedback: concise and actionable feedback, written in {language}
 - approved: true if the article is good enough to be accepted, otherwise false
 """
 
